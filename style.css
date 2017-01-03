@@ -1,0 +1,29 @@
+.footer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 1rem;
+  color: white;
+  text-align: left;
+}
+
+.raw {
+	color: gray;
+}
+
+button {
+	width: 90px;
+	height: 40px;
+	background: red;
+	color: white;
+	font-size: 1.2em;
+}
+
+html { 
+  background: url(bgimage.jpg) no-repeat center center fixed; 
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+}
