@@ -1,0 +1,356 @@
+<html>
+	<head>
+		<title>Play Music By Leap Motion Controller</title>
+		<link rel='stylesheet', href='style.css' >
+		<script src="https://js.leapmotion.com/leap-0.2.0.min.js"></script>
+		<script src="https://code.jquery.com/jquery-2.1.0.min.js"?></script>
+		<script>
+			// Store frame for motion functions
+			var previousFrame = null;
+			var paused = false;
+			var pauseOnGesture = false;
+
+			var intersectionPoint;
+			var relativeTouchPoint;
+
+
+			var globalFrame;
+			var fingerLineSegment;
+			var circle;
+			var globalFingerIds = [];
+			var globalPointables;
+
+			// Setup Leap loop with frame callback function
+			var controllerOptions = {enableGestures: true};
+
+			Leap.loop(controllerOptions, function(frame) {
+			  if (paused) {
+			    return; // Skip this update
+			  }
+
+		    globalFrame = frame;
+
+			  // Display Hand object data
+			  var handOutput = document.getElementById("handData");
+			  var handString = "";
+			  if (frame.hands.length > 0) {
+			    for (var i = 0; i < frame.hands.length; i++) {
+			      var hand = frame.hands[i];
+
+			      handString += "<div style='width:300px; float:left; padding:5px'>";
+			      handString += "Hand ID: " + hand.id + "<br />";
+			      handString += "Direction: " + vectorToString(hand.direction, 2) + "<br />";
+			      handString += "Palm normal: " + vectorToString(hand.palmNormal, 2) + "<br />";
+			      handString += "Palm position: " + vectorToString(hand.palmPosition) + " mm<br />";
+			      handString += "Palm velocity: " + vectorToString(hand.palmVelocity) + " mm/s<br />";
+			      handString += "Sphere center: " + vectorToString(hand.sphereCenter) + " mm<br />";
+			      handString += "Sphere radius: " + hand.sphereRadius.toFixed(1) + " mm<br />";
+
+			      // Hand motion factors
+			      if (previousFrame && previousFrame.valid) {
+			        var translation = hand.translation(previousFrame);
+			        handString += "Translation: " + vectorToString(translation) + " mm<br />";
+
+			        var rotationAxis = hand.rotationAxis(previousFrame, 2);
+			        var rotationAngle = hand.rotationAngle(previousFrame);
+			        handString += "Rotation axis: " + vectorToString(rotationAxis) + "<br />";
+			        handString += "Rotation angle: " + rotationAngle.toFixed(2) + " radians<br />";
+
+			        var scaleFactor = hand.scaleFactor(previousFrame);
+			        handString += "Scale factor: " + scaleFactor.toFixed(2) + "<br />";
+			      }
+
+			      // IDs of pointables (fingers and tools) associated with this hand
+			      if (hand.pointables.length > 0) {
+
+			        var fingerIds = [];
+					if (globalFingerIds.length <= hand.pointables.length) globalFingerIds = [];
+					
+			        var toolIds = [];
+			        for (var j = 0; j < hand.pointables.length; j++) {
+			          var pointable = hand.pointables[j];
+			          if (pointable.tool) {
+			            toolIds.push(pointable.id);
+			          }
+			          else {
+			            fingerIds.push(pointable.id);
+						if (globalFingerIds.length < 5)
+							globalFingerIds.push(pointable.id);
+			          }
+			        }
+					
+			        if (fingerIds.length > 0) {
+			          handString += "Fingers IDs: " + fingerIds.join(", ") + "<br />";
+			        }
+			        if (toolIds.length > 0) {
+			          handString += "Tools IDs: " + toolIds.join(", ") + "<br />";
+			        }
+			      }
+
+			      handString += "</div>";
+			    }
+			  }
+			  else {
+			    handString += "No hands";
+			  }
+			  handOutput.innerHTML = handString;
+
+			  // Display Pointable (finger and tool) object data
+			  var pointableOutput = document.getElementById("pointableData");
+			  var pointableString = "";
+			  
+			  toggleMusic(frame.pointables);
+			  
+			  if (frame.pointables.length > 0) {
+				  
+				for (var i = 0; i < frame.pointables.length; i++) {
+					
+			      var pointable = frame.pointables[i];
+
+			      pointableString += "<div style='width:250px; float:left; padding:5px'>";
+			      pointableString += "Pointable ID: " + pointable.id + "<br />";
+			      pointableString += "Belongs to hand with ID: " + pointable.handId + "<br />";
+
+			      if (pointable.tool) {
+			        pointableString += "Classified as a tool <br />";
+			        pointableString += "Length: " + pointable.length.toFixed(1) + " mm<br />";
+			        pointableString += "Width: "  + pointable.width.toFixed(1) + " mm<br />";
+			      }
+			      else {
+			        pointableString += "Classified as a finger<br />";
+			        pointableString += "Length: " + pointable.length.toFixed(1) + " mm<br />";
+			      }
+
+			      pointableString += "Direction: " + vectorToString(pointable.direction, 2) + "<br />";
+			      pointableString += "Tip position: " + vectorToString(pointable.tipPosition) + " mm<br />";
+			      pointableString += "Tip velocity: " + vectorToString(pointable.tipVelocity) + " mm/s<br />";
+
+			      pointableString += "</div>";
+			    }
+			  }
+			  else {
+			    pointableString += "<div>No pointables</div>";
+			  }
+			  pointableOutput.innerHTML = pointableString;
+
+			  // Store frame for motion functions
+			  previousFrame = frame;
+			})
+
+			function vectorToString(vector, digits) {
+			  if (typeof digits === "undefined") {
+			    digits = 1;
+			  }
+			  return "(" + vector[0].toFixed(digits) + ", "
+			             + vector[1].toFixed(digits) + ", "
+			             + vector[2].toFixed(digits) + ")";
+			}
+
+			function togglePause() {
+			  paused = !paused;
+
+			  if (paused) {
+			    document.getElementById("pause").innerText = "Resume";
+			  } else {
+			    document.getElementById("pause").innerText = "Pause";
+			  }
+			}
+
+			function pauseForGestures() {
+			  if (document.getElementById("pauseOnGesture").checked) {
+			    pauseOnGesture = true;
+			  } else {
+			    pauseOnGesture = false;
+			  }
+			}
+
+			function getMousePos(canvas, evt) {
+			  var rect = canvas.getBoundingClientRect();
+			  return {
+			    x: evt.clientX - rect.left,
+			    y: evt.clientY - rect.top
+			  };
+			}
+
+			$(document).ready(function(){
+
+			  buildMusic();
+			  assignButtons();
+			  circle = $("#circle");
+
+			});
+
+			var vocalSound, guitarSound, drumSound, melodySound, clickSound;
+			
+			function buildMusic(){
+				/* Vocal */
+				//Create the audio tag
+				vocalSound = document.createElement("audio");
+				vocalSound.preload = "auto";
+				vocalSound.loop = true;
+
+				//Load the sound file (using a source element for expandability)
+				var srcVocal = document.createElement("source");
+				srcVocal.src = "mp3/Traditional_House_Of_The_Rising_Sun_Vocal.mp3";
+				vocalSound.appendChild(srcVocal);
+
+				vocalSound.load();
+				vocalSound.volume = 0.0;
+				vocalSound.play();
+				
+				/* Guitar */
+				guitarSound = document.createElement("audio");
+				guitarSound.preload = "auto";
+				guitarSound.loop = true;
+				
+				var srcGuitar = document.createElement("source");
+				srcGuitar.src = "mp3/Traditional_House_Of_The_Rising_Sun_Guitar.mp3";
+				guitarSound.appendChild(srcGuitar);
+
+				guitarSound.load();
+				guitarSound.volume = 0.0;
+				guitarSound.play();
+				
+				/* Drum */
+				drumSound = document.createElement("audio");
+				drumSound.preload = "auto";
+				drumSound.loop = true;
+
+				var srcDrum = document.createElement("source");
+				srcDrum.src = "mp3/Traditional_House_Of_The_Rising_Sun_Drum.mp3";
+				drumSound.appendChild(srcDrum);
+
+				drumSound.load();
+				drumSound.volume = 0.0;
+				drumSound.play();
+				
+				/* Melody */
+				melodySound = document.createElement("audio");
+				melodySound.preload = "auto";
+				melodySound.loop = true;
+
+				var srcMelody = document.createElement("source");
+				srcMelody.src = "mp3/Traditional_House_Of_The_Rising_Sun_Melody.mp3";
+				melodySound.appendChild(srcMelody);
+
+				melodySound.load();
+				melodySound.volume = 0.0;
+				melodySound.play();
+				
+				/* Bass */
+				clickSound = document.createElement("audio");
+				clickSound.preload = "auto";
+				clickSound.loop = true;
+
+				var srcClick = document.createElement("source");
+				srcClick.src = "mp3/Traditional_House_Of_The_Rising_Sun_Click.mp3";
+				clickSound.appendChild(srcClick);
+
+				clickSound.load();
+				clickSound.volume = 0.0;
+				clickSound.play();
+			}
+			
+			function toggleMusic(pointables) {
+				
+				if (pointables != globalPointables) {
+					globalPointables = pointables;
+					vocalSound.volume = 0.0; $("#touch-vocal").css("background","red");
+					guitarSound.volume = 0.0; $("#touch-guitar").css("background","red");
+					drumSound.volume = 0.0; $("#touch-drum").css("background","red");
+					melodySound.volume = 0.0; $("#touch-melody").css("background","red");
+					clickSound.volume = 0.0; $("#touch-click").css("background","red");
+				}
+				
+				var pointableids = [];
+				for (var i = 0; i < pointables.length; i++) pointableids.push(pointables[i].id);
+				
+				if (pointables.length > 0) {
+					for (var i = 0; i < globalFingerIds.length; i++) {
+						var fingerId = globalFingerIds[i];
+						if (pointableids.indexOf(fingerId) != -1) {
+							switch(i) {
+								case 0:
+									vocalSound.volume = 1.00; 
+									$("#touch-vocal").css("background","green");
+									break;
+						
+								case 1:
+									guitarSound.volume = 1.00; 
+									$("#touch-guitar").css("background","green");
+									break;
+						
+								case 2:
+									drumSound.volume = 1.00; 
+									$("#touch-drum").css("background","green");
+									break;
+						
+								case 3:
+									melodySound.volume = 1.00; 
+									$("#touch-melody").css("background","green");
+									break;
+						
+								case 4:
+									clickSound.volume = 1.00; 
+									$("#touch-click").css("background","green");
+									break;
+							}
+						}
+					}
+				}
+				else {
+					vocalSound.volume = 0.0; $("#touch-vocal").css("background","red");
+					guitarSound.volume = 0.0; $("#touch-guitar").css("background","red");
+					drumSound.volume = 0.0; $("#touch-drum").css("background","red");
+					melodySound.volume = 0.0; $("#touch-melody").css("background","red");
+					clickSound.volume = 0.0; $("#touch-click").css("background","red");
+				}
+				
+			}
+			
+			function assignButtons(){
+			  	$("#touch-vocal").click(function(i){
+					toggleMusic(i.target.id);
+			  	});
+			  	$("#touch-guitar").click(function(i){
+					toggleMusic(i.target.id);
+			  	});
+			  	$("#touch-drum").click(function(i){
+					toggleMusic(i.target.id);
+			  	});
+			  	$("#touch-melody").click(function(i){
+					toggleMusic(i.target.id);
+			  	});
+			  	$("#touch-click").click(function(i){
+					toggleMusic(i.target.id);
+			  	});
+			}
+			
+		</script>
+	</head>
+	<body>
+		<div align="center">
+			<h1>Put one hand on the Leap and let finger controls the music!</h1>
+			<div id="main">
+				<button id="touch-vocal"> Vocal </button>
+				<button id="touch-guitar"> Guitar </button>
+				<button id="touch-drum"> Drum </button>
+				<button id="touch-melody"> Melody </button>
+				<button id="touch-click"> Click </button>
+			</div>
+		</div>
+		
+		<div id="raw">
+			<div style="clear:both;"></div>
+			<h3 class="raw">Hand data:</h3>
+			<div id="handData" class="raw"></div>
+			<div style="clear:both;"></div>
+			<h3 class="raw">Finger data:</h3>
+			<div id="pointableData" class="raw"></div>
+			<div style="clear:both;"></div>
+		</div>
+		<div id="footer" class="footer">
+			<h6>Music: House of The Rising Sun; Image: SnapWire CCO License</h6>
+		</div>
+	</body>
+</html>
